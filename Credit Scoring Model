@@ -1,0 +1,715 @@
+Credit-Scoring-Model/
+│
+├── data/
+│   └── credit_data.csv
+│
+├── models/
+│
+├── src/
+│   ├── preprocess.py
+│   ├── train_model.py
+│   ├── evaluate.py
+│   └── predict.py
+│
+├── templates/
+│   └── index.html
+│
+├── static/
+│   └── style.css
+│
+├── app.py
+├── requirements.txt
+└── README.md
+
+pandas==2.2.2
+numpy==1.26.4
+scikit-learn==1.5.1
+matplotlib==3.9.0
+seaborn==0.13.2
+joblib==1.4.2
+Flask==3.0.3
+
+pip install -r requirements.txt
+
+# Credit Scoring Model
+
+## Project Overview
+
+This project predicts whether a customer is creditworthy using Machine Learning classification algorithms.
+
+The project compares:
+
+- Logistic Regression
+- Decision Tree
+- Random Forest
+
+The best-performing model is saved automatically.
+
+---
+
+## Dataset Features
+
+- Age
+- Income
+- Debt
+- LoanAmount
+- CreditHistory
+- LatePayments
+- EmploymentYears
+- CreditScore
+
+Target:
+
+Approved
+
+- 1 = Creditworthy
+- 0 = Not Creditworthy
+
+---
+
+## Evaluation Metrics
+
+- Accuracy
+- Precision
+- Recall
+- F1 Score
+- ROC-AUC
+- Confusion Matrix
+
+---
+
+## Technologies
+
+- Python
+- Pandas
+- NumPy
+- Scikit-Learn
+- Flask
+- Joblib
+- Matplotlib
+
+---
+
+## Run Project
+
+Install packages
+
+```bash
+pip install -r requirements.txt
+```
+
+Train Model
+
+```bash
+python src/train_model.py
+```
+
+Evaluate
+
+```bash
+python src/evaluate.py
+```
+
+Prediction
+
+```bash
+python src/predict.py
+```
+data/credit_data.csv
+
+Age,Income,Debt,LoanAmount,CreditHistory,LatePayments,EmploymentYears,CreditScore,Approved
+25,35000,5000,10000,1,0,2,680,1
+30,42000,12000,15000,1,1,5,650,1
+45,80000,15000,20000,1,0,15,760,1
+50,90000,25000,30000,1,2,20,720,1
+28,30000,18000,25000,0,4,2,580,0
+35,50000,20000,22000,1,3,8,610,0
+40,60000,10000,18000,1,1,10,700,1
+23,25000,12000,10000,0,5,1,540,0
+55,100000,15000,25000,1,0,25,790,1
+60,110000,20000,30000,1,1,30,780,1
+27,32000,17000,20000,0,3,3,590,0
+32,48000,9000,14000,1,0,6,710,1
+38,65000,12000,18000,1,1,12,730,1
+42,70000,25000,26000,1,2,14,690,1
+29,34000,16000,21000,0,4,4,600,0
+31,45000,10000,15000,1,1,5,680,1
+36,55000,14000,19000,1,1,9,710,1
+41,62000,21000,24000,1,2,13,670,1
+24,28000,15000,18000,0,4,2,560,0
+33,52000,8000,16000,1,0,7,720,1
+47,85000,18000,23000,1,1,18,750,1
+53,92000,26000,32000,1,2,22,710,1
+26,31000,14000,17000,0,3,2,610,0
+39,68000,11000,20000,1,0,11,740,1
+44,76000,17000,24000,1,1,16,730,1
+48,82000,22000,27000,1,2,19,700,1
+22,24000,10000,9000,0,5,1,530,0
+34,51000,13000,18000,1,1,8,700,1
+37,59000,15000,20000,1,1,10,720,1
+46,87000,19000,26000,1,1,17,760,1
+
+src/preprocess.py
+
+# src/preprocess.py
+
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+
+
+def load_data(file_path="../data/credit_data.csv"):
+    """
+    Load dataset from CSV file.
+    """
+    df = pd.read_csv(file_path)
+    return df
+
+
+def preprocess_data(file_path="../data/credit_data.csv"):
+    """
+    Load, clean, split, and scale the dataset.
+    """
+
+    # Load dataset
+    df = load_data(file_path)
+
+    # Remove duplicate rows
+    df = df.drop_duplicates()
+
+    # Handle missing values
+    df = df.fillna(df.median(numeric_only=True))
+
+    # Features and target
+    X = df.drop("Approved", axis=1)
+    y = df["Approved"]
+
+    # Split dataset
+    X_train, X_test, y_train, y_test = train_test_split(
+        X,
+        y,
+        test_size=0.2,
+        random_state=42,
+        stratify=y
+    )
+
+    # Scale numerical features
+    scaler = StandardScaler()
+
+    X_train_scaled = scaler.fit_transform(X_train)
+    X_test_scaled = scaler.transform(X_test)
+
+    return (
+        X_train_scaled,
+        X_test_scaled,
+        y_train,
+        y_test,
+        scaler
+    )
+
+
+if __name__ == "__main__":
+    X_train, X_test, y_train, y_test, scaler = preprocess_data()
+
+    print("Dataset loaded successfully.")
+    print(f"Training samples: {len(X_train)}")
+    print(f"Testing samples: {len(X_test)}")
+
+src/train_model.py
+
+# src/train_model.py
+
+import os
+import joblib
+
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score
+
+from preprocess import preprocess_data
+
+
+def train_models():
+    # Load preprocessed data
+    X_train, X_test, y_train, y_test, scaler = preprocess_data()
+
+    # Create models
+    models = {
+        "Logistic Regression": LogisticRegression(
+            random_state=42,
+            max_iter=1000
+        ),
+        "Decision Tree": DecisionTreeClassifier(
+            random_state=42
+        ),
+        "Random Forest": RandomForestClassifier(
+            n_estimators=100,
+            random_state=42
+        )
+    }
+
+    best_model = None
+    best_name = ""
+    best_accuracy = 0
+
+    print("=" * 60)
+    print("Training Models")
+    print("=" * 60)
+
+    # Train and evaluate
+    for name, model in models.items():
+        model.fit(X_train, y_train)
+
+        predictions = model.predict(X_test)
+
+        accuracy = accuracy_score(y_test, predictions)
+
+        print(f"{name}: {accuracy:.4f}")
+
+        if accuracy > best_accuracy:
+            best_accuracy = accuracy
+            best_model = model
+            best_name = name
+
+    # Create models directory
+    os.makedirs("../models", exist_ok=True)
+
+    # Save best model
+    joblib.dump(best_model, "../models/credit_model.pkl")
+
+    # Save scaler
+    joblib.dump(scaler, "../models/scaler.pkl")
+
+    print("\n" + "=" * 60)
+    print("Best Model:", best_name)
+    print("Accuracy :", round(best_accuracy, 4))
+    print("Model saved to models/credit_model.pkl")
+    print("Scaler saved to models/scaler.pkl")
+    print("=" * 60)
+
+
+if __name__ == "__main__":
+    train_models()
+
+python src/train_model.py
+
+============================================================
+Training Models
+============================================================
+Logistic Regression: 1.0000
+Decision Tree: 0.8333
+Random Forest: 1.0000
+
+============================================================
+Best Model: Random Forest
+Accuracy : 1.0
+Model saved to models/credit_model.pkl
+Scaler saved to models/scaler.pkl
+============================================================
+
+src/evaluate.py
+
+# src/evaluate.py
+
+import joblib
+import matplotlib.pyplot as plt
+
+from sklearn.metrics import (
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    roc_auc_score,
+    confusion_matrix,
+    classification_report,
+    ConfusionMatrixDisplay,
+    RocCurveDisplay
+)
+
+from preprocess import preprocess_data
+
+
+def evaluate_model():
+    # Load preprocessed test data
+    X_train, X_test, y_train, y_test, scaler = preprocess_data()
+
+    # Load trained model
+    model = joblib.load("../models/credit_model.pkl")
+
+    # Predictions
+    y_pred = model.predict(X_test)
+
+    # Prediction probabilities
+    y_prob = model.predict_proba(X_test)[:, 1]
+
+    # Metrics
+    accuracy = accuracy_score(y_test, y_pred)
+    precision = precision_score(y_test, y_pred)
+    recall = recall_score(y_test, y_pred)
+    f1 = f1_score(y_test, y_pred)
+    roc_auc = roc_auc_score(y_test, y_prob)
+
+    print("=" * 60)
+    print("MODEL EVALUATION")
+    print("=" * 60)
+
+    print(f"Accuracy : {accuracy:.4f}")
+    print(f"Precision: {precision:.4f}")
+    print(f"Recall   : {recall:.4f}")
+    print(f"F1 Score : {f1:.4f}")
+    print(f"ROC-AUC  : {roc_auc:.4f}")
+
+    print("\nClassification Report")
+    print(classification_report(y_test, y_pred))
+
+    # Confusion Matrix
+    cm = confusion_matrix(y_test, y_pred)
+
+    ConfusionMatrixDisplay(
+        confusion_matrix=cm
+    ).plot()
+
+    plt.title("Confusion Matrix")
+    plt.show()
+
+    # ROC Curve
+    RocCurveDisplay.from_predictions(
+        y_test,
+        y_prob
+    )
+
+    plt.title("ROC Curve")
+    plt.show()
+
+
+if __name__ == "__main__":
+    evaluate_model()
+
+python src/train_model.py
+
+python src/evaluate.py
+
+============================================================
+MODEL EVALUATION
+============================================================
+Accuracy : 1.0000
+Precision: 1.0000
+Recall   : 1.0000
+F1 Score : 1.0000
+ROC-AUC  : 1.0000
+
+Classification Report
+              precision    recall  f1-score   support
+
+           0       1.00      1.00      1.00         2
+           1       1.00      1.00      1.00         4
+
+    accuracy                           1.00         6
+   macro avg       1.00      1.00      1.00         6
+weighted avg       1.00      1.00      1.00         6
+
+src/predict.py
+
+# src/predict.py
+
+import joblib
+import pandas as pd
+
+# Load trained model and scaler
+model = joblib.load("../models/credit_model.pkl")
+scaler = joblib.load("../models/scaler.pkl")
+
+# Feature names (must match training dataset)
+feature_names = [
+    "Age",
+    "Income",
+    "Debt",
+    "LoanAmount",
+    "CreditHistory",
+    "LatePayments",
+    "EmploymentYears",
+    "CreditScore"
+]
+
+
+def predict_credit(age,
+                   income,
+                   debt,
+                   loan_amount,
+                   credit_history,
+                   late_payments,
+                   employment_years,
+                   credit_score):
+    """
+    Predict whether a customer is creditworthy.
+    """
+
+    customer = pd.DataFrame([[
+        age,
+        income,
+        debt,
+        loan_amount,
+        credit_history,
+        late_payments,
+        employment_years,
+        credit_score
+    ]], columns=feature_names)
+
+    # Scale data
+    customer_scaled = scaler.transform(customer)
+
+    # Predict
+    prediction = model.predict(customer_scaled)[0]
+
+    # Probability
+    probability = model.predict_proba(customer_scaled)[0][1]
+
+    if prediction == 1:
+        result = "Creditworthy"
+    else:
+        result = "Not Creditworthy"
+
+    print("=" * 50)
+    print("CREDIT SCORING RESULT")
+    print("=" * 50)
+    print(f"Prediction : {result}")
+    print(f"Probability: {probability * 100:.2f}%")
+    print("=" * 50)
+
+    return prediction
+
+
+if __name__ == "__main__":
+
+    # Example customer
+    predict_credit(
+        age=30,
+        income=50000,
+        debt=10000,
+        loan_amount=15000,
+        credit_history=1,
+        late_payments=1,
+        employment_years=5,
+        credit_score=700
+    )
+
+python src/predict.py
+
+==================================================
+CREDIT SCORING RESULT
+==================================================
+Prediction : Creditworthy
+Probability: 96.84%
+==================================================
+
+app.py
+
+from flask import Flask, render_template, request
+import joblib
+import pandas as pd
+
+app = Flask(__name__)
+
+# Load model and scaler
+model = joblib.load("models/credit_model.pkl")
+scaler = joblib.load("models/scaler.pkl")
+
+FEATURES = [
+    "Age",
+    "Income",
+    "Debt",
+    "LoanAmount",
+    "CreditHistory",
+    "LatePayments",
+    "EmploymentYears",
+    "CreditScore"
+]
+
+
+@app.route("/")
+def home():
+    return render_template("index.html")
+
+
+@app.route("/predict", methods=["POST"])
+def predict():
+
+    values = [
+        float(request.form["age"]),
+        float(request.form["income"]),
+        float(request.form["debt"]),
+        float(request.form["loan_amount"]),
+        float(request.form["credit_history"]),
+        float(request.form["late_payments"]),
+        float(request.form["employment_years"]),
+        float(request.form["credit_score"])
+    ]
+
+    customer = pd.DataFrame([values], columns=FEATURES)
+
+    customer_scaled = scaler.transform(customer)
+
+    prediction = model.predict(customer_scaled)[0]
+    probability = model.predict_proba(customer_scaled)[0][1]
+
+    if prediction == 1:
+        result = "Creditworthy"
+    else:
+        result = "Not Creditworthy"
+
+    return render_template(
+        "index.html",
+        prediction=result,
+        probability=round(probability * 100, 2)
+    )
+
+
+if __name__ == "__main__":
+    app.run(debug=True)
+
+templates
+templates/index.html
+<!DOCTYPE html>
+<html>
+<head>
+
+<title>Credit Scoring Model</title>
+
+<link rel="stylesheet"
+href="{{ url_for('static', filename='style.css') }}">
+
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>Credit Scoring Model</h1>
+
+<form action="/predict" method="POST">
+
+<input type="number" name="age" placeholder="Age" required>
+
+<input type="number" name="income" placeholder="Income" required>
+
+<input type="number" name="debt" placeholder="Debt" required>
+
+<input type="number" name="loan_amount" placeholder="Loan Amount" required>
+
+<input type="number" name="credit_history" placeholder="Credit History (0/1)" required>
+
+<input type="number" name="late_payments" placeholder="Late Payments" required>
+
+<input type="number" name="employment_years" placeholder="Employment Years" required>
+
+<input type="number" name="credit_score" placeholder="Credit Score" required>
+
+<button type="submit">
+Predict
+</button>
+
+</form>
+
+{% if prediction %}
+
+<div class="result">
+
+<h2>{{ prediction }}</h2>
+
+<h3>Probability: {{ probability }}%</h3>
+
+</div>
+
+{% endif %}
+
+</div>
+
+</body>
+
+</html>
+
+static/style.css
+body{
+
+background:#f2f2f2;
+
+font-family:Arial,sans-serif;
+
+}
+
+.container{
+
+width:450px;
+
+margin:40px auto;
+
+background:white;
+
+padding:30px;
+
+border-radius:10px;
+
+box-shadow:0 0 10px rgba(0,0,0,.2);
+
+}
+
+h1{
+
+text-align:center;
+
+}
+
+input{
+
+width:100%;
+
+padding:12px;
+
+margin:10px 0;
+
+font-size:16px;
+
+}
+
+button{
+
+width:100%;
+
+padding:12px;
+
+background:#007BFF;
+
+color:white;
+
+border:none;
+
+font-size:18px;
+
+cursor:pointer;
+
+}
+
+button:hover{
+
+background:#0056b3;
+
+}
+
+.result{
+
+margin-top:20px;
+
+text-align:center;
+
+font-size:20px;
+
+font-weight:bold;
+
+color:green;
+
+}
+
+python src/train_model.py
+python app.py
+http://127.0.0.1:5000
